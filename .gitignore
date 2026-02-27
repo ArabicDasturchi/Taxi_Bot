@@ -1,0 +1,21 @@
+# Virtual environment
+venv/
+env/
+.env
+
+# Python caching
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Pyrogram session files
+*.session
+*.session-journal
+
+# Database
+*.sqlite
+*.db
+
+# Logs
+*.log
