@@ -41,6 +41,7 @@ async def show_drivers(message: Message):
 
 @admin_router.callback_query(F.data.startswith("approve_"))
 async def approve_payment(callback: CallbackQuery, bot: Bot):
+    await callback.answer()
     if not is_admin(callback.from_user.id):
         return
         
@@ -55,6 +56,7 @@ async def approve_payment(callback: CallbackQuery, bot: Bot):
 
 @admin_router.callback_query(F.data.startswith("reject_"))
 async def reject_payment(callback: CallbackQuery, bot: Bot):
+    await callback.answer()
     if not is_admin(callback.from_user.id):
         return
         
