@@ -66,6 +66,7 @@ class UserbotManager:
                         )
                         try:
                             await message.reply_text(reply_text)
+                            await CRUD.increment_clients_found(session, user_id)
                             # Optional: Update seats count or just let the driver do it manually
                         except Exception as e:
                             logger.error(f"Cannot auto-reply for {db_user.full_name}: {e}")
@@ -115,6 +116,7 @@ class UserbotManager:
                         if dialog.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
                             try:
                                 await client.send_message(dialog.chat.id, ad_text)
+                                await CRUD.increment_ads_sent(session, user_id)
                                 await asyncio.sleep(2)  # delay to prevent spam limits
                             except Exception as e:
                                 logger.error(f"Error sending ad for {db_user.full_name} to {dialog.chat.id}: {e}")

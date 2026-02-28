@@ -49,6 +49,22 @@ class CRUD:
         await session.commit()
 
     @staticmethod
+    async def increment_ads_sent(session: AsyncSession, user_id: int):
+        user = await session.execute(select(User).where(User.id == user_id))
+        user_obj = user.scalars().first()
+        if user_obj:
+            await session.execute(update(User).where(User.id == user_id).values(ads_sent=user_obj.ads_sent + 1))
+            await session.commit()
+
+    @staticmethod
+    async def increment_clients_found(session: AsyncSession, user_id: int):
+        user = await session.execute(select(User).where(User.id == user_id))
+        user_obj = user.scalars().first()
+        if user_obj:
+            await session.execute(update(User).where(User.id == user_id).values(clients_found=user_obj.clients_found + 1))
+            await session.commit()
+
+    @staticmethod
     async def add_passenger_route(session: AsyncSession, driver_id: int, from_city: str, to_city: str):
         new_route = Route(driver_id=driver_id, from_city=from_city, to_city=to_city)
         session.add(new_route)

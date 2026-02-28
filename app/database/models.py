@@ -18,6 +18,8 @@ class User(Base):
     bot_enabled = Column(Boolean, default=False) # Whether auto-forwarding is ON
     session_string = Column(String(500), nullable=True) # User's own pyrogram session
     available_seats = Column(Integer, default=4) # Available seats
+    ads_sent = Column(Integer, default=0) # Number of ads sent
+    clients_found = Column(Integer, default=0) # Number of clients auto-replied
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     
     routes = relationship("Route", back_populates="driver")

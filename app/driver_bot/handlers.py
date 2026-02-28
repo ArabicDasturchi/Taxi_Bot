@@ -359,8 +359,17 @@ async def update_seats(message: Message, state: FSMContext):
 
 @driver_router.message(F.text == "📊 Mening Statistikam")
 async def driver_stats(message: Message):
-    # Dummy stat logic for driver
-    await message.answer("📊 <b>Sizning Statistikangiz:</b>\n\n✅ Topilgan mijozlar: 0 ta\n📤 Yuborilgan e'lonlar: 0 ta\n⏳ Hisobingiz faol.")
+    async with AsyncSessionLocal() as session:
+        user = await CRUD.get_user(session, message.from_user.id)
+        if not user: return
+        
+        stat_text = (
+            f"📊 <b>Sizning Statistikangiz:</b>\n\n"
+            f"✅ <b>Topilgan mijozlar:</b> {user.clients_found} ta\n"
+            f"📤 <b>Yuborilgan e'lonlar:</b> {user.ads_sent} marta\n"
+            f"⏳ Hisobingiz faol."
+        )
+        await message.answer(stat_text)
 
 @driver_router.message(F.text == "⚙️ Mening Ma'lumotlarim")
 async def my_data_info(message: Message):
