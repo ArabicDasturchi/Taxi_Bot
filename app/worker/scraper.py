@@ -9,7 +9,7 @@ from app.database.crud import CRUD
 
 logger = logging.getLogger(__name__)
 
-TARGET_GROUPS = ["@andijon_toshkent_taksi", "@vodiy_toshkent_taxi_1"] # Example groups
+# Removed TARGET_GROUPS. Bots will now operate in ALL groups the user account is a member of.
 
 class UserbotManager:
     def __init__(self):
@@ -38,7 +38,8 @@ class UserbotManager:
             in_memory=True
         )
         
-        @client.on_message(filters.chat(TARGET_GROUPS) & filters.text)
+        # Listen to ALL groups the user is a member of
+        @client.on_message(filters.group & filters.text)
         async def parse_clients(c: Client, message: Message):
             text = message.text.lower()
             if "taksi kerak" in text or "toshkentga" in text or "vodiyga" in text or "toshkent" in text or "andijonga" in text:
@@ -73,14 +74,6 @@ class UserbotManager:
             await client.start()
             self.clients[user_id] = client
             logger.info(f"Started multi-userbot for user_id={user_id}")
-            
-            # Ensure the user has joined the target groups
-            for group in TARGET_GROUPS:
-                try:
-                    await client.join_chat(group)
-                    await asyncio.sleep(1)
-                except Exception as eg:
-                    logger.error(f"join_chat error for {group}: {eg}")
                     
         except Exception as e:
             logger.error(f"Failed to start multi-userbot for user_id={user_id}: {e}")
@@ -115,12 +108,17 @@ class UserbotManager:
                         f"✅ <i>(Tez va xavfsiz manzilga yetib aytamiz, aloqaga chiqing!)</i>"
                     )
                     
-                    for group in TARGET_GROUPS:
-                        try:
-                            await client.send_message(group, ad_text)
-                            await asyncio.sleep(2)
-                        except Exception as e:
-                            logger.error(f"Error sending ad for {db_user.full_name} to {group}: {e}")
+                    # Interate through ALL groups the user is already a member of
+                    from pyrogram.enums import ChatType
+                    
+                    async for dialog in client.get_dialogs():
+                        if dialog.chat.type in [ChatType.GROUP, ChatType.SUPERGROUP]:
+                            try:
+                                await client.send_message(dialog.chat.id, ad_text)
+                                await asyncio.sleep(2)  # delay to prevent spam limits
+                            except Exception as e:
+                                logger.error(f"Error sending ad for {db_user.full_name} to {dialog.chat.id}: {e}")
+                                
             except Exception as e:
                 logger.error(f"Error in send_ads for {user_id}: {e}")
 
