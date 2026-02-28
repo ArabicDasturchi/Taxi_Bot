@@ -35,7 +35,7 @@ class UserbotManager:
             api_id=int(API_ID),
             api_hash=API_HASH,
             session_string=session_string,
-            in_memory=True
+            in_memory=False # Important: False so that Pyrogram caches peers properly.
         )
         
         # Listen to ALL groups the user is a member of
