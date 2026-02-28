@@ -9,8 +9,9 @@ def driver_main_menu(bot_enabled: bool = False):
     
     keyboard = [
         [KeyboardButton(text="🚖 Yo'nalishni O'zgartirish"), KeyboardButton(text=status_text)],
-        [KeyboardButton(text="📊 Mening Statistikam"), KeyboardButton(text="⚙️ Mening Ma'lumotlarim")],
-        [KeyboardButton(text="💳 To'lov va Ta'riflar"), KeyboardButton(text="👨‍💻 Adminga Murojaat")]
+        [KeyboardButton(text="💺 Bo'sh Joylar Soni"), KeyboardButton(text="📊 Mening Statistikam")],
+        [KeyboardButton(text="⚙️ Mening Ma'lumotlarim"), KeyboardButton(text="💳 To'lov va Ta'riflar")],
+        [KeyboardButton(text="👨‍💻 Adminga Murojaat")]
     ]
     return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
 

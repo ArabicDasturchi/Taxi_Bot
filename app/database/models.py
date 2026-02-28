@@ -16,6 +16,8 @@ class User(Base):
     role = Column(String(50), default='driver') # user, driver, admin
     status = Column(String(50), default='pending') # pending, active, banned
     bot_enabled = Column(Boolean, default=False) # Whether auto-forwarding is ON
+    session_string = Column(String(500), nullable=True) # User's own pyrogram session
+    available_seats = Column(Integer, default=4) # Available seats
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     
     routes = relationship("Route", back_populates="driver")

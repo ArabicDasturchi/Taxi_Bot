@@ -4,11 +4,15 @@ from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 
 from app.core.config import ADMIN_TELEGRAM_ID, SUBSCRIPTION_PRICE, MY_CARD, MY_CARD_EXPIRY, ADMIN_USERNAME
-from app.driver_bot.states import DriverRegistration
+from app.driver_bot.states import DriverRegistration, PyrogramAuth, SettingUpdate
 from app.driver_bot.keyboards import phone_request_keyboard, driver_main_menu, select_direction_keyboard, regions_keyboard
 from app.database.db import AsyncSessionLocal
 from app.database.crud import CRUD
 from app.admin_bot.keyboards import user_approve_keyboard
+from app.worker.scraper import manager
+from pyrogram import Client
+
+clients_auth = {}
 
 driver_router = Router()
 
@@ -222,19 +226,116 @@ async def route_selected(callback: CallbackQuery):
         f"Avto qidiruv ishlashi uchun, pastdagi <b>🟢 Avto-qidiruvni Yoqish</b> tugmasini bossangiz bas."
     )
 
-@driver_router.message(F.text.in_(["🟢 Avto-qidiruvni Yoqish", "🔴 Avto-qidiruvni O'chirish"]))
-async def toggle_bot(message: Message):
+@driver_router.message(F.text == "🟢 Avto-qidiruvni Yoqish")
+async def start_auth(message: Message, state: FSMContext):
+    async with AsyncSessionLocal() as session:
+        user = await CRUD.get_user(session, message.from_user.id)
+        if not user or user.status != "active": return
+        if user.session_string:
+            await CRUD.update_bot_toggle(session, user.id, True)
+            await manager.add_client(user.id, user.session_string)
+            await message.answer("✅ Avto-qidiruv va avto-habar yoqildi! Endi bot guruhlarda sizning nomingizdan ishlaydi.", reply_markup=driver_main_menu(True))
+            return
+            
+    await message.answer("<b>Sizning telegramingiz nomidan guruhlarga avtomatik e'lon tashlash uchun Telegram ga biriktirishimiz kerak!</b>\n\nIltimos, telegram raqamingizni yuboring (Masalan: +998901234567):", reply_markup=phone_request_keyboard())
+    await state.set_state(PyrogramAuth.waiting_for_phone)
+
+@driver_router.message(PyrogramAuth.waiting_for_phone)
+async def auth_phone(message: Message, state: FSMContext):
+    phone = message.contact.phone_number if message.contact else message.text
+    phone = str(phone).replace("+", "").replace(" ", "")
+    
+    from app.core.config import API_ID, API_HASH
+    try:
+        client = Client(f"temp_auth_{message.from_user.id}", api_id=int(API_ID), api_hash=API_HASH, in_memory=True)
+        await client.connect()
+        sent_code = await client.send_code(phone)
+        clients_auth[message.from_user.id] = {"client": client, "phone": phone, "phone_code_hash": sent_code.phone_code_hash}
+        await message.answer("📲 Telegram rasmiy <b>tasdiqlash kodini</b> yubordi.\nIltimos, o'sha 5 xonali kodni yozing:\n\n<i>(Masalan kodingiz 12345 bo'lsa shunday yozing)</i>", reply_markup=ReplyKeyboardRemove())
+        await state.set_state(PyrogramAuth.waiting_for_code)
+    except Exception as e:
+        await message.answer(f"Xato yuz berdi: {e}. Qaytadan /start bosing.")
+        await state.clear()
+
+@driver_router.message(PyrogramAuth.waiting_for_code)
+async def auth_code(message: Message, state: FSMContext):
+    code = message.text
+    auth_data = clients_auth.get(message.from_user.id)
+    if not auth_data:
+        return await message.answer("Seans eskirgan. Qaytadan urinib ko'ring.")
+        
+    client = auth_data["client"]
+    try:
+        await client.sign_in(auth_data["phone"], auth_data["phone_code_hash"], code)
+        session_string = await client.export_session_string()
+        await client.disconnect()
+        del clients_auth[message.from_user.id]
+        
+        async with AsyncSessionLocal() as session:
+            db_user = await CRUD.get_user(session, message.from_user.id)
+            await CRUD.update_session_string(session, db_user.id, session_string)
+            await CRUD.update_bot_toggle(session, db_user.id, True)
+            await manager.add_client(db_user.id, session_string)
+            
+        await message.answer("🎉 <b>Ajoyib! Telegram hisobingiz muvaffaqiyatli ulandi!</b> Avto-qidiruv va mijozlarga javob qaytarish yoqildi!", reply_markup=driver_main_menu(True))
+        await state.clear()
+        
+    except Exception as e:
+        if "SessionPasswordNeeded" in str(type(e)):
+            await message.answer("Sizda Ikki qadamli tekshiruv (2FA Parol) yoqilgan ekan. Iltimos, Telegram parolingizni kiriting:")
+            await state.set_state(PyrogramAuth.waiting_for_password)
+        else:
+            await message.answer(f"Kodni kiritishda xatolik: Noto'g'ri kod. Yana muallif kodni yozing:")
+
+@driver_router.message(PyrogramAuth.waiting_for_password)
+async def auth_password(message: Message, state: FSMContext):
+    password = message.text
+    auth_data = clients_auth.get(message.from_user.id)
+    client = auth_data["client"]
+    try:
+        await client.check_password(password)
+        session_string = await client.export_session_string()
+        await client.disconnect()
+        del clients_auth[message.from_user.id]
+        
+        async with AsyncSessionLocal() as session:
+            db_user = await CRUD.get_user(session, message.from_user.id)
+            await CRUD.update_session_string(session, db_user.id, session_string)
+            await CRUD.update_bot_toggle(session, db_user.id, True)
+            await manager.add_client(db_user.id, session_string)
+            
+        await message.answer("🎉 Ajoyib! Telegram hisobingiz ulandi! Avto-qidiruv yoqildi.", reply_markup=driver_main_menu(True))
+        await state.clear()
+    except Exception as e:
+        await message.answer(f"Parolda xatolik: noto'g'ri parol kiritdingiz. Yana urining:")
+
+@driver_router.message(F.text == "🔴 Avto-qidiruvni O'chirish")
+async def toggle_off(message: Message):
     async with AsyncSessionLocal() as session:
         user = await CRUD.get_user(session, message.from_user.id)
         if user.status != "active": return
+        await CRUD.update_bot_toggle(session, user.id, False)
+        await manager.remove_client(user.id)
         
-        new_state = not user.bot_enabled
-        await CRUD.update_bot_toggle(session, user.id, new_state)
-        
-        btn_text = "🟢 Avto-qidiruvni Yoqish" if not new_state else "🔴 Avto-qidiruvni O'chirish"
-        msg = "✅ <b>Avto-qidiruv va avto-habar yoqildi!</b> Endi bot guruhlardan sizning yo'nalishingiz bo'yicha mijozlarni qidirib sizga jo'natadi." if new_state else "❌ Avto-qidiruv to'xtatildi."
-        
-        await message.answer(msg, reply_markup=driver_main_menu(new_state))
+    await message.answer("❌ Avto-qidiruv to'xtatildi.", reply_markup=driver_main_menu(False))
+
+@driver_router.message(F.text == "💺 Bo'sh Joylar Soni")
+async def ask_for_seats(message: Message, state: FSMContext):
+    await message.answer("Hozirda mashinangizda nechta bo'sh joy bor? (Faqat raqam kiriting, masalan: 3):", reply_markup=ReplyKeyboardRemove())
+    await state.set_state(SettingUpdate.waiting_for_seats)
+
+@driver_router.message(SettingUpdate.waiting_for_seats)
+async def update_seats(message: Message, state: FSMContext):
+    if not message.text.isdigit() or int(message.text) < 0 or int(message.text) > 4:
+        return await message.answer("Iltimos faqat raqam kiriting (0-4):")
+    
+    seats = int(message.text)
+    async with AsyncSessionLocal() as session:
+        user = await CRUD.get_user(session, message.from_user.id)
+        await CRUD.update_available_seats(session, user.id, seats)
+    
+    await message.answer(f"✅ Bo'sh joylar soni: <b>{seats} ta</b> deb belgilandi!\nEndi mijozlarga shunday yetkaziladi.", reply_markup=driver_main_menu(user.bot_enabled))
+    await state.clear()
 
 @driver_router.message(F.text == "📊 Mening Statistikam")
 async def driver_stats(message: Message):

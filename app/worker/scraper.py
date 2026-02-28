@@ -3,108 +3,123 @@ import logging
 from pyrogram import Client, filters
 from pyrogram.types import Message
 
-from app.core.config import API_ID, API_HASH, SESSION_STRING, PHONE
+from app.core.config import API_ID, API_HASH
 from app.database.db import AsyncSessionLocal
 from app.database.crud import CRUD
 
 logger = logging.getLogger(__name__)
 
-# We delay instantiating the userbot until start_userbot is called 
-# to prevent asyncio loop errors during import.
-userbot = None
-
 TARGET_GROUPS = ["@andijon_toshkent_taksi", "@vodiy_toshkent_taxi_1"] # Example groups
 
-async def start_userbot():
-    global userbot
-    if not API_ID or not API_HASH:
-        logger.warning("Pyrogram Userbot not configured. Missing API_ID/API_HASH.")
-        return
+class UserbotManager:
+    def __init__(self):
+        self.clients = {}  # user_id: Client
         
-    userbot = Client(
-        "taxi_userbot",
-        api_id=int(API_ID),
-        api_hash=API_HASH,
-        phone_number=PHONE,
-        session_string=SESSION_STRING if SESSION_STRING else None
-    )
-    
-    # Message listener for parsing clients needs to be bound here if userbot is local/global
-    @userbot.on_message(filters.chat(TARGET_GROUPS) & filters.text)
-    async def parse_clients(client: Client, message: Message):
-        text = message.text.lower()
-        if "taksi kerak" in text or "toshkentga" in text or "vodiyga" in text or "andijonga" in text or "farg'onaga" in text or "namanganga" in text:
-            logger.info(f"Potential client found: {message.text}")
+    async def start_all(self):
+        if not API_ID or not API_HASH:
+            logger.warning("Pyrogram Userbot API keys not configured.")
+            return
+
+        async with AsyncSessionLocal() as session:
+            users = await CRUD.get_all_users(session)
+            for user in users:
+                if user.status == 'active' and user.bot_enabled and user.session_string:
+                    await self.add_client(user.id, user.session_string)
+
+    async def add_client(self, user_id, session_string):
+        if user_id in self.clients:
+            return
             
-            async with AsyncSessionLocal() as session:
-                users = await CRUD.get_all_users(session)
-                active_drivers = [u for u in users if u.status == 'active' and u.bot_enabled]
+        client = Client(
+            f"userbot_{user_id}",
+            api_id=int(API_ID),
+            api_hash=API_HASH,
+            session_string=session_string,
+            in_memory=True
+        )
+        
+        @client.on_message(filters.chat(TARGET_GROUPS) & filters.text)
+        async def parse_clients(c: Client, message: Message):
+            text = message.text.lower()
+            if "taksi kerak" in text or "toshkentga" in text or "vodiyga" in text or "toshkent" in text or "andijonga" in text:
                 
-                # Check if we have any matching routes
-                matching_driver = None
-                for driver in active_drivers:
-                    routes = await CRUD.get_routes_by_driver(session, driver.id)
+                async with AsyncSessionLocal() as session:
+                    db_user = await CRUD.get_user_by_id(session, user_id)
+                    if not db_user or not db_user.bot_enabled or db_user.available_seats <= 0:
+                        return
+                        
+                    # Filter by route
+                    routes = await CRUD.get_routes_by_driver(session, user_id)
+                    route_matches = False
                     for r in routes:
-                        from_c = r.from_city.lower()
-                        to_c = r.to_city.lower()
-                        # Very simple match logic: if message mentions the destination or origin
-                        if from_c in text or to_c in text or "toshkent" in text or "vodiy" in text:
-                            matching_driver = driver
-                            break
-                    if matching_driver:
-                        break
-                
-                # If no specific route matched, pick any active bot driver
-                if not matching_driver and active_drivers:
-                    matching_driver = active_drivers[0]
-                    
-            if matching_driver:
-                reply_text = (
-                    f"👋 Salom! Sizga taksi kerakmi? Bizning ishonchli haydovchimiz xizmatga tayyor!\n\n"
-                    f"👤 <b>Shofyor:</b> {matching_driver.full_name}\n"
-                    f"🚗 <b>Mashina:</b> {matching_driver.car_model or 'Komfort avto'}\n"
-                    f"📞 <b>Aloqaga chiqing:</b> {matching_driver.contact_number}\n\n"
-                    f"✅ <i>(Tez va xavfsiz manzilga yetib oling!)</i>"
-                )
-                try:
-                    await message.reply_text(reply_text)
-                except Exception as e:
-                    logger.error(f"Cannot auto-reply client: {e}")
+                        if r.from_city.lower() in text or r.to_city.lower() in text:
+                            route_matches = True
+                            
+                    if route_matches:
+                        reply_text = (
+                            f"👋 Salom! Men huddi shu yo'nalishda taksi haydovchisiman, xizmatga tayyorman!\n\n"
+                            f"🚗 <b>Mashinam:</b> {db_user.car_model or 'Komfort avto'}\n"
+                            f"💺 <b>Bo'sh joylar:</b> {db_user.available_seats} ta\n"
+                            f"📞 <b>Menga aloqaga chiqing:</b> {db_user.contact_number}\n\n"
+                            f"✅ <i>(Ayni ushbu holatda manzilga tez ketamiz)</i>"
+                        )
+                        try:
+                            await message.reply_text(reply_text)
+                            # Optional: Update seats count or just let the driver do it manually
+                        except Exception as e:
+                            logger.error(f"Cannot auto-reply for {db_user.full_name}: {e}")
+
+        try:
+            await client.start()
+            self.clients[user_id] = client
+            logger.info(f"Started multi-userbot for user_id={user_id}")
+        except Exception as e:
+            logger.error(f"Failed to start multi-userbot for user_id={user_id}: {e}")
+
+    async def remove_client(self, user_id):
+        if user_id in self.clients:
+            try:
+                await self.clients[user_id].stop()
+            except:
+                pass
+            del self.clients[user_id]
+            logger.info(f"Stopped multi-userbot for user_id={user_id}")
             
-    logger.info("Starting Pyrogram Userbot...")
-    await userbot.start()
+    async def send_ads(self):
+        for user_id, client in list(self.clients.items()):
+            try:
+                async with AsyncSessionLocal() as session:
+                    db_user = await CRUD.get_user_by_id(session, user_id)
+                    if not db_user or not db_user.bot_enabled or db_user.available_seats <= 0:
+                        continue
+                        
+                    routes = await CRUD.get_routes_by_driver(session, user_id)
+                    if not routes: continue
+                    
+                    route_str = f"{routes[-1].from_city} ⇄ {routes[-1].to_city}"
+                        
+                    ad_text = (
+                        f"🚕 <b>TAXI: {route_str.upper()}</b>\n\n"
+                        f"💺 <b>Bo'sh joylar:</b> {db_user.available_seats} ta mavjud\n"
+                        f"🚗 <b>Mashinam:</b> {db_user.car_model or 'Komfort avto'}\n"
+                        f"📞 <b>Meni raqamim:</b> {db_user.contact_number}\n\n"
+                        f"✅ <i>(Tez va xavfsiz manzilga yetib aytamiz, aloqaga chiqing!)</i>"
+                    )
+                    
+                    for group in TARGET_GROUPS:
+                        try:
+                            await client.send_message(group, ad_text)
+                            await asyncio.sleep(2)
+                        except Exception as e:
+                            logger.error(f"Error sending ad for {db_user.full_name} to {group}: {e}")
+            except Exception as e:
+                logger.error(f"Error in send_ads for {user_id}: {e}")
+
+# Global instance
+manager = UserbotManager()
+
+async def start_userbot():
+    await manager.start_all()
 
 async def send_ads_to_groups():
-    if not userbot: return
-    logger.info("Running auto ad scheduler task...")
-    
-    async with AsyncSessionLocal() as session:
-        users = await CRUD.get_all_users(session)
-        
-        # Get all users with their routes efficiently using eager loading if possible, or just load mapping
-        # For simple structure, let's load all active with bot
-        for driver in users:
-            if driver.status != 'active' or not driver.bot_enabled:
-                continue
-            
-            routes = await CRUD.get_routes_by_driver(session, driver.id)
-            if not routes:
-                continue
-                
-            # Formatting multiple destinations if available, else first one
-            route_str = f"{routes[-1].from_city} ⇄ {routes[-1].to_city}"
-                
-            ad_text = (
-                f"🚕 <b>TAXI XIZMATI: {route_str.upper()}</b>\n\n"
-                f"👤 <b>Haydovchi</b>: {driver.full_name}\n"
-                f"🚗 <b>Mashina</b>: {driver.car_model or 'Komfort avto'}\n"
-                f"📞 <b>Murojaat uchun</b>: {driver.contact_number}\n\n"
-                f"✅ <i>Xavfsiz, qulay va o'z vaqtida manzilingizga yetkazamiz! Shu raqamga aloqaga chiqing!</i>"
-            )
-            
-            for group in TARGET_GROUPS:
-                try:
-                    await userbot.send_message(group, ad_text)
-                    await asyncio.sleep(2)
-                except Exception as e:
-                    logger.error(f"Error sending ad to {group}: {e}")
+    await manager.send_ads()

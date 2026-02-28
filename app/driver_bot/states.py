@@ -5,3 +5,11 @@ class DriverRegistration(StatesGroup):
     waiting_for_phone = State()
     waiting_for_contact_number = State()
     waiting_for_car_model = State()
+
+class PyrogramAuth(StatesGroup):
+    waiting_for_phone = State()
+    waiting_for_code = State()
+    waiting_for_password = State()
+
+class SettingUpdate(StatesGroup):
+    waiting_for_seats = State()

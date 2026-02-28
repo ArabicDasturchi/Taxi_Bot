@@ -39,6 +39,16 @@ class CRUD:
         await session.commit()
 
     @staticmethod
+    async def update_available_seats(session: AsyncSession, user_id: int, seats: int):
+        await session.execute(update(User).where(User.id == user_id).values(available_seats=seats))
+        await session.commit()
+
+    @staticmethod
+    async def update_session_string(session: AsyncSession, user_id: int, session_str: str):
+        await session.execute(update(User).where(User.id == user_id).values(session_string=session_str))
+        await session.commit()
+
+    @staticmethod
     async def add_passenger_route(session: AsyncSession, driver_id: int, from_city: str, to_city: str):
         new_route = Route(driver_id=driver_id, from_city=from_city, to_city=to_city)
         session.add(new_route)
