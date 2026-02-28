@@ -139,6 +139,36 @@ async def handle_payment_receipt(message: Message, bot: Bot):
             await bot.send_message(ADMIN_TELEGRAM_ID, f"💰 <b>Foydalanuvchi to'lov chekini yubordi.</b>\nFoydalanuvchi ID: {user.id}\nIsmi: {user.full_name}\nTasdiqlaysizmi?")
             await message.answer("⏳ <b>To'lovingiz adminga yuborildi.</b>\n\nTasdiqlanishini kuting. Tasdiqlangach sizga xabar yuboriladi.")
 
+@driver_router.callback_query(F.data.startswith("approve_"))
+async def approve_payment(callback: CallbackQuery, bot: Bot):
+    await callback.answer()
+    if callback.from_user.id != ADMIN_TELEGRAM_ID:
+        return
+        
+    user_id = int(callback.data.split("_")[1])
+    async with AsyncSessionLocal() as session:
+        await CRUD.update_user_status(session, user_id, "active")
+        user = await CRUD.get_user_by_id(session, user_id)
+        
+    if user:
+        await bot.send_message(user.telegram_id, "✅ <b>Sizning to'lovingiz tasdiqlandi!</b>\n\nSiz endi tizimdan to'liq foydalanishingiz mumkin.")
+    await callback.message.edit_text("✅ To'lov tasdiqlandi va haydovchi 'active' holatiga o'tkazildi.")
+
+@driver_router.callback_query(F.data.startswith("reject_"))
+async def reject_payment(callback: CallbackQuery, bot: Bot):
+    await callback.answer()
+    if callback.from_user.id != ADMIN_TELEGRAM_ID:
+        return
+        
+    user_id = int(callback.data.split("_")[1])
+    async with AsyncSessionLocal() as session:
+        await CRUD.update_user_status(session, user_id, "rejected")
+        user = await CRUD.get_user_by_id(session, user_id)
+        
+    if user:
+        await bot.send_message(user.telegram_id, "❌ <b>To'lovingiz rad etildi!</b>\n\nIltimos to'lov chekini qaytadan yuboring yoki adminga murojaat qiling.")
+    await callback.message.edit_text("❌ To'lov rad etildi va haydovchiga xabar yuborildi.")
+
 @driver_router.message(F.text == "🚖 Yo'nalishni O'zgartirish")
 async def choose_route(message: Message):
     async with AsyncSessionLocal() as session:
