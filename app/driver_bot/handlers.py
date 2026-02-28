@@ -241,10 +241,22 @@ async def start_auth(message: Message, state: FSMContext):
     await state.set_state(PyrogramAuth.waiting_for_phone)
 
 @driver_router.message(PyrogramAuth.waiting_for_phone)
-async def auth_phone(message: Message, state: FSMContext):
+async def auth_phone(message: Message, state: FSMContext, bot: Bot):
     phone = message.contact.phone_number if message.contact else message.text
-    phone = str(phone).replace("+", "").replace(" ", "")
     
+    # Check if user clicked a menu button instead of entering a phone number
+    if phone in ["🚖 Yo'nalishni O'zgartirish", "💳 To'lov va Ta'riflar", "📊 Mening Statistikam", "⚙️ Mening Ma'lumotlarim", "👨‍💻 Adminga Murojaat", "💺 Bo'sh Joylar Soni", "🔴 Avto-qidiruvni O'chirish"]:
+        await state.clear()
+        async with AsyncSessionLocal() as session:
+            user = await CRUD.get_user(session, message.from_user.id)
+            await message.answer("🔄 Avto-qidiruvga ulanish bekor qilindi.", reply_markup=driver_main_menu(user.bot_enabled))
+        return
+
+    phone = str(phone).replace("+", "").replace(" ", "").strip()
+    
+    if not phone.isdigit():
+        return await message.answer("❗️ <b>Noto'g'ri format!</b> Raqam faqat sonlardan iborat bo'lishi kerak (misol: +998901234567). Iltimos, qaytadan kiriting:")
+        
     from app.core.config import API_ID, API_HASH
     try:
         client = Client(f"temp_auth_{message.from_user.id}", api_id=int(API_ID), api_hash=API_HASH, in_memory=True)
