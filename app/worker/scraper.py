@@ -73,6 +73,15 @@ class UserbotManager:
             await client.start()
             self.clients[user_id] = client
             logger.info(f"Started multi-userbot for user_id={user_id}")
+            
+            # Ensure the user has joined the target groups
+            for group in TARGET_GROUPS:
+                try:
+                    await client.join_chat(group)
+                    await asyncio.sleep(1)
+                except Exception as eg:
+                    logger.error(f"join_chat error for {group}: {eg}")
+                    
         except Exception as e:
             logger.error(f"Failed to start multi-userbot for user_id={user_id}: {e}")
 
