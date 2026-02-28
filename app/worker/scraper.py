@@ -75,7 +75,14 @@ class UserbotManager:
             await client.start()
             self.clients[user_id] = client
             logger.info(f"Started multi-userbot for user_id={user_id}")
-                    
+            
+            # MUHIM: Xatoni oldini olish uchun hamma guruhlarni xotiraga yuklab olamiz
+            try:
+                async for _ in client.get_dialogs():
+                    pass
+            except Exception as cache_err:
+                logger.warning(f"Keshni yuklashda xatolik user_id={user_id}: {cache_err}")
+                
         except Exception as e:
             logger.error(f"Failed to start multi-userbot for user_id={user_id}: {e}")
 
