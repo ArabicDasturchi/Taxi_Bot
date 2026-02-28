@@ -58,11 +58,11 @@ class UserbotManager:
                             
                     if route_matches:
                         reply_text = (
-                            f"👋 Salom! Men huddi shu yo'nalishda taksi haydovchisiman, xizmatga tayyorman!\n\n"
-                            f"🚗 <b>Mashinam:</b> {db_user.car_model or 'Komfort avto'}\n"
-                            f"💺 <b>Bo'sh joylar:</b> {db_user.available_seats} ta\n"
-                            f"📞 <b>Menga aloqaga chiqing:</b> {db_user.contact_number}\n\n"
-                            f"✅ <i>(Ayni ushbu holatda manzilga tez ketamiz)</i>"
+                            f"Assalomu alaykum! Shu yo'nalish bo'yicha yo'lga chiqyapman.\n\n"
+                            f"🚗 Avtomobil: <b>{db_user.car_model or 'Komfort avto'}</b>\n"
+                            f"💺 Bo'sh joylar: <b>{db_user.available_seats} ta</b>\n"
+                            f"📞 Murojaat uchun: <b>{db_user.contact_number}</b>\n\n"
+                            f"✨ <i>Manzilga tez, qulay va xavfsiz yetib olamiz. Joy band qilish uchun aloqaga chiqing!</i>"
                         )
                         try:
                             await message.reply_text(reply_text)
@@ -102,11 +102,11 @@ class UserbotManager:
                     route_str = f"{routes[-1].from_city} ⇄ {routes[-1].to_city}"
                         
                     ad_text = (
-                        f"🚕 <b>TAXI: {route_str.upper()}</b>\n\n"
-                        f"💺 <b>Bo'sh joylar:</b> {db_user.available_seats} ta mavjud\n"
-                        f"🚗 <b>Mashinam:</b> {db_user.car_model or 'Komfort avto'}\n"
-                        f"📞 <b>Meni raqamim:</b> {db_user.contact_number}\n\n"
-                        f"✅ <i>(Tez va xavfsiz manzilga yetib aytamiz, aloqaga chiqing!)</i>"
+                        f"🚕 <b>{route_str.upper()}</b> yo'nalishi bo'yicha taksi xizmati!\n\n"
+                        f"🚗 Avtomobil: <b>{db_user.car_model or 'Komfort avto'}</b>\n"
+                        f"💺 Hozirda <b>{db_user.available_seats} ta</b> bo'sh joy mavjud.\n"
+                        f"📞 Bog'lanish uchun: <b>{db_user.contact_number}</b>\n\n"
+                        f"✨ <i>Manzilga qulay, tez va xavfsiz holda eltib qo'yamiz. Yo'lga chiqishga tayyormiz!</i>"
                     )
                     
                     # Interate through ALL groups the user is already a member of
