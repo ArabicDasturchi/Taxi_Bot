@@ -28,4 +28,4 @@ ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "YourAdminUsername").replace("
 # Payment Settings
 MY_CARD = os.environ.get("MY_CARD", "9860 0825 3462 9983")
 MY_CARD_EXPIRY = os.environ.get("MY_CARD_EXPIRY", "04/30")
-SUBSCRIPTION_PRICE = 200000  # 200,000 so'm
+SUBSCRIPTION_PRICE = 300000  # 300,000 so'm
