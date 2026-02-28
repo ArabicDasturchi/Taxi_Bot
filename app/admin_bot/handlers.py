@@ -47,10 +47,25 @@ async def approve_payment(callback: CallbackQuery, bot: Bot):
     user_id = int(callback.data.split("_")[1])
     async with AsyncSessionLocal() as session:
         await CRUD.update_user_status(session, user_id, "active")
-        user = await CRUD.get_user(session, user_id)
+        user = await CRUD.get_user_by_id(session, user_id)
         
-    await bot.send_message(user_id, "✅ <b>Sizning to'lovingiz tasdiqlandi!</b>\n\nSiz endi tizimdan to'liq foydalanishingiz mumkin.")
+    if user:
+        await bot.send_message(user.telegram_id, "✅ <b>Sizning to'lovingiz tasdiqlandi!</b>\n\nSiz endi tizimdan to'liq foydalanishingiz mumkin.")
     await callback.message.edit_text("✅ To'lov tasdiqlandi va haydovchi 'active' holatiga o'tkazildi.")
+
+@admin_router.callback_query(F.data.startswith("reject_"))
+async def reject_payment(callback: CallbackQuery, bot: Bot):
+    if not is_admin(callback.from_user.id):
+        return
+        
+    user_id = int(callback.data.split("_")[1])
+    async with AsyncSessionLocal() as session:
+        await CRUD.update_user_status(session, user_id, "rejected")
+        user = await CRUD.get_user_by_id(session, user_id)
+        
+    if user:
+        await bot.send_message(user.telegram_id, "❌ <b>To'lovingiz rad etildi!</b>\n\nIltimos to'lov chekini qaytadan yuboring yoki adminga murojaat qiling.")
+    await callback.message.edit_text("❌ To'lov rad etildi va haydovchiga xabar yuborildi.")
 
 @admin_router.message(F.text == "📈 Umumiy Statistika")
 async def show_stats(message: Message):

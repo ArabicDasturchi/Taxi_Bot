@@ -11,6 +11,11 @@ class CRUD:
         return result.scalars().first()
 
     @staticmethod
+    async def get_user_by_id(session: AsyncSession, user_id: int):
+        result = await session.execute(select(User).where(User.id == user_id))
+        return result.scalars().first()
+
+    @staticmethod
     async def create_user(session: AsyncSession, telegram_id: int, full_name: str, phone_number: str, contact_number: str, car_model: str, role: str = 'driver'):
         new_user = User(telegram_id=telegram_id, full_name=full_name, phone_number=phone_number, contact_number=contact_number, car_model=car_model, role=role)
         session.add(new_user)
