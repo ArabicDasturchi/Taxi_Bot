@@ -259,7 +259,7 @@ async def auth_phone(message: Message, state: FSMContext):
 
 @driver_router.message(PyrogramAuth.waiting_for_code)
 async def auth_code(message: Message, state: FSMContext):
-    code = message.text
+    code = message.text.replace(" ", "").replace("-", "").strip()
     auth_data = clients_auth.get(message.from_user.id)
     if not auth_data:
         return await message.answer("Seans eskirgan. Qaytadan urinib ko'ring.")
